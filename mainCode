@@ -1,0 +1,146 @@
+/*
+Primary function to get the courses from the endpoint. It can optionally take a subject ID. 
+Note that the endpoint can take other parameters to query, this is just an example
+*/
+function getCourses(subject) {
+  if (isNaN(subject)&&subject!=undefined){
+    throw "Bad subject ID number"
+  }
+  else if (subject){ //format it for the URL
+    subject ="?subject_id="+subject
+  }
+  else { //Nothing passed. Append null string
+    subject=""
+  }
+  
+  ////////////Primary API Call
+  var courseList = queryData("academics.courses:list","https://api.veracross.com/saas/v3/academics/courses"+subject)
+
+  //Deal with the target sheet
+  var targetSheet = displayPrompt("We found "+courseList.length+" results. Enter the sheet name where the results should go. Any contents present will be erased.")
+  var activeSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(targetSheet)
+  if (!activeSheet){
+    activeSheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet().setName(targetSheet)
+  }
+
+  //Reformatting the return list. Note that the API return an array of JSON objects
+  var responseHeaders = getObjectTitles([courseList[0]])
+  var arrayForSheet = jsonToArray(courseList)
+  
+  activeSheet.clear()
+  activeSheet.getRange(1,1,1,responseHeaders.length).setValues([responseHeaders])
+  activeSheet.getRange(2,1,arrayForSheet.length,arrayForSheet[0].length).setValues(arrayForSheet)
+}
+
+//Get a single course by using the read courses endpoint
+function getCourseByID(courseID){
+  if (isNaN(courseID)){
+    throw "Bad course ID number"
+  }
+  //API Call
+  var courseList = queryData("academics.courses:read","https://api.veracross.com/saas/v3/academics/courses/"+courseID)
+
+  var targetSheet = displayPrompt("We found "+courseList.length+" results. Enter the sheet name where the results should go. This will APPEND data to the sheet")
+  var activeSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(targetSheet)
+  if (!activeSheet){
+    SpreadsheetApp.getActiveSpreadsheet().insertSheet().setName(targetSheet)
+  }
+  var arrayForSheet = jsonToArray(courseList)
+  activeSheet.getRange(activeSheet.getLastRow()+1,1,1,arrayForSheet[0].length).setValues(arrayForSheet)
+}
+
+/* This is an example of using the queryData function to retrieve, not the data of an endpoint but the Value Lists
+If any header is entered to the queryData, it is assumed to be the value lists header and it will only return the value list and not the results. 
+Currently, this function call does not support other header options. 
+Value lists are a set of values that you can expect in certain fields through the API. These values are NOT findable in Axiom and can be unique 
+to a school. In the case below, I used this to the get Academic Type of the courses. For me 5 is an academic class. Once I had these values
+I no longer needed this function. 
+*/
+function getCourseTypes(){
+  ///////queryData with the value lists header. See above. 
+  var courseTypes = queryData("academics.courses:list","https://api.veracross.com/saas/v3/academics/courses",{"X-API-Value-Lists": "include"})
+  var myArray = mapToObjectArray(courseTypes)
+  if(SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Course Types")){
+    var existingSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Course Types")
+    existingSheet.clear()
+    existingSheet.getRange(1,1,myArray.length,myArray[0].length).setValues(myArray)
+  }
+  else{
+    var newSheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet().setName("Course Types")
+    newSheet.getRange(1,1,myArray.length,myArray[0].length).setValues(myArray)
+  }
+  
+}
+
+
+////////////////////////Utility Functions. Thank you ChatGPT
+function getObjectTitles(jsonArray) {
+    // Initialize an empty array to store the titles
+    var titles = [];
+
+    // Loop through each object in the JSON array
+    for (var i = 0; i < jsonArray.length; i++) {
+        // Get the current object
+        var obj = jsonArray[i];
+
+        // Loop through each key in the object
+        for (var key in obj) {
+            // Check if the key is a property of the object itself (not inherited)
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                // Add the key (title) to the titles array if it's not already there
+                if (titles.indexOf(key) === -1) {
+                    titles.push(key);
+                }
+            }
+        }
+    }
+
+    return titles;
+}
+
+function jsonToArray(jsonArray) {
+    // Initialize an empty array to store the result
+    var result = [];
+
+    // Loop through each object in the JSON array
+    for (var i = 0; i < jsonArray.length; i++) {
+        // Initialize an empty array for the values of each object
+        var row = [];
+
+        // Get the current object
+        var obj = jsonArray[i];
+
+        // Loop through each key in the object
+        for (var key in obj) {
+            // Check if the key is a property of the object itself (not inherited)
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                // Push the value of the current key to the row array
+                row.push(obj[key]);
+            }
+        }
+
+        // Push the row array to the result array
+        result.push(row);
+    }
+
+    return result;
+}
+
+function mapToObjectArray(jsonArray) {
+    var result = [];
+
+    // Iterate over each object in the JSON array
+    for (var i = 0; i < jsonArray.length; i++) {
+        var obj = jsonArray[i];
+        var field = obj.fields[0]; // Assuming fields has only one value at index 0
+
+        // Iterate over each item in the items array
+        for (var j = 0; j < obj.items.length; j++) {
+            var item = obj.items[j];
+            var row = [field, item.id, item.description];
+            result.push(row);
+        }
+    }
+
+    return result;
+}
