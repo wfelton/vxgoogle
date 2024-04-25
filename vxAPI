@@ -105,12 +105,12 @@ function getTokenByClientCredentials (scope){
     } else  {
        // Not fully authorized for this action.
        //This could use more robust error handling. Fun Fact: Error 416 means "I'm a teapot", look it up. 
-       logIssue("Backend server error: " + code+" Error:"+responseText)
+       Logger.log("Backend server error: " + code+" Error:"+responseText)
        throw ("Backend server error: " + code+" Error:"+responseText);
     } 
   }
   if (!token) {
-      logIssue("In Protected Resource: Failed-Token:"+token+" url:"+url+" headers:"+headers)
+      Logger.log("In Protected Resource: Failed-Token:"+token+" url:"+url+" headers:"+headers)
       throw new Error("Unable to retrieve access token. Try again")
   }
 }
