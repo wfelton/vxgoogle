@@ -1,0 +1,116 @@
+//Primary API Access Function
+//This is used for server side data pulls. Not user initiated. 
+//Scopes: The scope you are requesting. This is found in the VX docs
+//URL: The url of the proper endpoint
+//Token: In the case of an authorized request the calling function might have a token. 
+function queryData(scopes, url, headers){
+  Logger.log("Making VX query- scopes:"+scopes+" url:"+url+" token:"+token)
+  tokenObj = getTokenByClientCredentials(scopes) //Very important. Get access token
+  var token = tokenObj.access_token ||false;
+
+  var page_size = 1000
+  var dataLength = 1000
+  var returnArray =[]
+
+  //This loop manages for multi page return values. 
+  //It requests a page number (i) and then keeps track of the data length until 
+  //the data and the page size are different. This indicates that we received less than 1000 rows and
+  //that is the last page. One possible issue is if a page returns 1000 rows and that is in fact the last page. Untested. 
+  for (var i=1;dataLength==page_size;i++){
+     //Used to handle pagination and any additional headers
+    headers =  Object.assign({},{ "X-Page-Size" : page_size, "X-Page-Number":i},headers) 
+    try{
+      //This is where the URL Fetch is called
+      var response = sendUrlFetch(token,url,headers) //Primary fetch command
+    }
+    catch(e){
+      Logger.log("In Query Data: No data returned. Error: "+e.message)
+      throw("In Query Data: No data returned. Error: "+e.message)
+    }
+    if (response){
+      if(response.data){
+        //Keep loading the returnarray with however many pages we are getting. 
+        returnArray.push(response.data) //Save the data from that page
+        dataLength=response.data.length //used for managing the loop
+      }
+    }
+  }
+  if (headers.hasOwnProperty("X-API-Value-Lists")){
+    return response.value_lists
+  }
+  return [].concat.apply([],returnArray)
+  //This is a weird way to flatten a two dimensional array
+}
+
+//This retrieves the cleint token. This can not be used if you are using SSO
+function getTokenByClientCredentials (scope){
+  //ALERT: You must find a better way to secure the client_id and secret. 
+  //Currently, this code uses the Script Properties, but this is insecure. 
+  //Looking into using Google Locker. 
+  var client_id = PropertiesService.getScriptProperties().getProperty("id")
+  var client_secret= PropertiesService.getScriptProperties().getProperty("Secret")
+  
+  //This encode function will reformat any scope sent it to be URI compatible.
+  var encoded = encodeURIComponent(scope)
+  /*In getting the access token, the URl is pretty straight forward
+  All we need is the scope and ask for access based on the client id and secret.*/
+
+  var options = {
+    'method' : 'post',
+    'contentType': 'application/x-www-form-urlencoded',
+    'payload' :"client_id="+client_id+"&" + "client_secret="+client_secret+"&" + 
+    "scope="+encoded+"&" + 
+    "grant_type=client_credentials"   ///This is what makes it a client credentials request
+  };
+  try {
+    
+    var response = UrlFetchApp.fetch("https://accounts.veracross.com/saas/oauth/token/", options) //Fetch the token
+  }
+  catch (e){
+    return false;
+  }
+     var content = JSON.parse(response.getContentText())
+     if (content){
+      //Create the token object
+       var myToken = new Token(content.access_token,content.expires_in,content.refresh_token,content.scope)
+      return myToken
+     }
+     else {
+       return false
+     }
+  }
+
+  //We now have at token and need to make the API Call
+  function sendUrlFetch(token, url, headers) {
+  if (token) {
+    // A token is present, but it may be expired or invalid. Make a
+    // request and check the response code to be sure.
+    var method ='get';
+    headers['Authorization'] = Utilities.formatString('Bearer %s', token);
+    headers['contentType']='application/x-www-form-urlencoded'
+    var resp = UrlFetchApp.fetch(url, {
+      'method' : method,
+      'headers': headers,
+      'muteHttpExceptions': true, // Prevents thrown HTTP exceptions. I am checking them by hand. 
+    });
+
+    var code = resp.getResponseCode();
+    var responseText = resp.getContentText("utf-8")
+    if (code >= 200 && code < 300) {
+      if (responseText.length>50){
+        responseText=responseText.substring(0,50)
+      }
+      Logger.log("Successful HTTP request " + code+" Error:"+responseText)
+      return JSON.parse(resp.getContentText("utf-8")); // Success
+    } else  {
+       // Not fully authorized for this action.
+       //This could use more robust error handling. Fun Fact: Error 416 means "I'm a teapot", look it up. 
+       logIssue("Backend server error: " + code+" Error:"+responseText)
+       throw ("Backend server error: " + code+" Error:"+responseText);
+    } 
+  }
+  if (!token) {
+      logIssue("In Protected Resource: Failed-Token:"+token+" url:"+url+" headers:"+headers)
+      throw new Error("Unable to retrieve access token. Try again")
+  }
+}
