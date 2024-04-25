@@ -1,0 +1,25 @@
+function onOpen(){
+  var myUI = SpreadsheetApp.getUi()
+
+  myUI.createMenu("Query VX")
+  .addItem("Get All Courses","getCourses")
+  .addItem("Get a Single Subject", "getSubject")
+  .addItem("Get Single Course", "getSingleCourse")
+  .addToUi()
+}
+
+function displayPrompt(text) {
+  var ui = SpreadsheetApp.getUi();
+  var result = ui.prompt(text);
+  return result.getResponseText()
+}
+
+function getSubject(){
+  var subject = displayPrompt("Enter the internal ID number of the subject you want")
+  getCourses(subject)
+}
+
+function getSingleCourse(){
+  var courseID = displayPrompt("Enter the internal ID number of the course you want")
+  getCourseByID(courseID)
+}
