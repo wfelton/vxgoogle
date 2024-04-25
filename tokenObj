@@ -1,0 +1,10 @@
+function Token(token, expires, refresh, scopes) {
+  this.access_token = token;
+  this.expires_in = expires;
+  this.refresh_token = refresh;
+  this.scopes = scopes;
+
+  // This is not necessary in a traditional constructor function
+  // as 'this' is implicitly returned.
+  // return this;
+}
