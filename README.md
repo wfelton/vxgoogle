@@ -6,7 +6,7 @@ This script is a bound script so you need to open the script editor from a googl
 
 The four files are as follows
 
-vxAPI: The three primary functions used to execite the API calls. 
+vxAPI: The three primary functions used to execute the API calls. 
 
 mainCode: The apps script that manages calling the API functions, handles all writing to the Spreadsheet. Also has a few helper functions
 
